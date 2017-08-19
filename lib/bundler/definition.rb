@@ -55,7 +55,15 @@ module Bundler
     # @param ruby_version [Bundler::RubyVersion, nil] Requested Ruby Version
     # @param optional_groups [Array(String)] A list of optional groups
     def initialize(lockfile, dependencies, sources, unlock, ruby_version = nil, optional_groups = [], gemfiles = [])
-      @unlocking = unlock == true || !unlock.empty?
+      if [true, false].include?(unlock)
+        @unlocking_bundler = false
+        @unlocking = unlock
+      else
+        unlock = unlock.dup
+        @unlocking_bundler = unlock.delete(:bundler)
+        unlock.delete_if {|_k, v| Array(v).empty? }
+        @unlocking = !unlock.empty?
+      end
 
       @dependencies    = dependencies
       @sources         = sources
@@ -325,8 +333,10 @@ module Bundler
                           "after which you will be unable to return to Bundler #{@locked_bundler_version.segments.first}."
         end
       end
+      p @unlocking_bundler
 
-      preserve_unknown_sections ||= !updating_major && (Bundler.frozen? || !unlocking?)
+      preserve_unknown_sections ||= !updating_major && (Bundler.frozen? || !(unlocking? || @unlocking_bundler))
+      p preserve_unknown_sections
       return if lockfiles_equal?(@lockfile_contents, contents, preserve_unknown_sections)
 
       if Bundler.frozen?
